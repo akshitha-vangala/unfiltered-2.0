@@ -1,0 +1,146 @@
+:root {
+    /* -- Your Palette -- */
+    --bg-dark: #1E1B22;
+    --card-light: #EDE7DF;
+    --text-primary: #F5EFE8;
+    --text-secondary: #B8ADA3;
+    --accent: #C08B8B;      /* Muted Red/Pink */
+    --highlight: #D6B26E;   /* Gold */
+    
+    --radius: 12px;
+}
+
+body {
+    background-color: var(--bg-dark);
+    color: var(--text-primary);
+    font-family: 'Inter', sans-serif; /* Optional: Clean font */
+    margin: 0;
+    padding: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+}
+
+/* --- Screen Container --- */
+.screen {
+    display: none;
+    width: 100%;
+    max-width: 500px;
+    text-align: center;
+    animation: fadeIn 0.4s ease-in-out;
+}
+
+.screen.active {
+    display: block;
+}
+
+/* --- Typography --- */
+h1 { color: var(--highlight); margin-bottom: 20px; }
+h2 { color: var(--text-primary); margin-bottom: 15px; }
+h3 { color: var(--text-secondary); font-size: 0.9rem; text-transform: uppercase; margin-bottom: 10px; }
+p { color: var(--text-secondary); line-height: 1.5; }
+
+/* --- Inputs --- */
+input[type="text"], input[type="number"] {
+    width: 100%;
+    padding: 15px;
+    margin-bottom: 15px;
+    border: 2px solid transparent;
+    border-radius: var(--radius);
+    background-color: var(--card-light);
+    color: var(--bg-dark);
+    font-size: 1.1rem;
+    font-family: inherit;
+    box-sizing: border-box; /* Fixes padding issues */
+}
+
+input:focus {
+    outline: none;
+    border-color: var(--highlight);
+    box-shadow: 0 0 10px rgba(214, 178, 110, 0.3);
+}
+
+/* --- Buttons --- */
+button {
+    width: 100%;
+    padding: 15px;
+    border: none;
+    border-radius: var(--radius);
+    background-color: var(--accent);
+    color: var(--text-primary);
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: 0.2s;
+    margin-top: 10px;
+}
+
+button:hover { filter: brightness(1.1); transform: translateY(-2px); }
+button:active { transform: scale(0.98); }
+
+/* --- PLAYER LIST (Lobby) --- */
+#player-list-container {
+    margin: 20px 0;
+    padding: 15px;
+    background: rgba(255, 255, 255, 0.05); /* Subtle glass background */
+    border-radius: var(--radius);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#player-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+}
+
+#player-list li {
+    background-color: transparent;
+    border: 1px solid var(--text-secondary);
+    color: var(--text-secondary);
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+}
+
+#player-list li.me {
+    border-color: var(--highlight);
+    color: var(--highlight);
+    font-weight: bold;
+    background-color: rgba(214, 178, 110, 0.1);
+}
+
+/* --- SETTINGS (Host Controls) --- */
+#host-controls {
+    margin-top: 25px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.setting-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+}
+
+.setting-group input {
+    width: 80px;
+    text-align: center;
+    font-weight: bold;
+    padding: 10px;
+}
+
+/* --- Animations --- */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
