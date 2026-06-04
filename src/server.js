@@ -110,6 +110,27 @@ async function deleteRoom(redisClient, room) {
     .exec();
 }
 
+/**
+ * Fetch every player profile in a room and compile final stats.
+ * Returns an array sorted by score descending, with funnyPoints included.
+ * Safe to call before deleteRoom — reads user Hashes by player list order.
+ */
+async function compileEndGameStats(redisClient, room) {
+  const playerIds = await getPlayers(redisClient, room);
+  const profiles  = await Promise.all(
+    playerIds.map(id => getUser(redisClient, id))
+  );
+
+  return profiles
+    .filter(Boolean)
+    .map(p => ({
+      name:        p.name,
+      score:       p.score       ?? 0,
+      funnyPoints: p.funnyPoints ?? 0,
+    }))
+    .sort((a, b) => b.score - a.score);
+}
+
 /** Read a user Hash as a plain object. */
 async function getUser(redisClient, socketId) {
   const data = await redisClient.hGetAll(KEYS.user(socketId));
@@ -365,9 +386,15 @@ async function main() {
           });
           setTimeout(() => startNewRound(pubClient, io, user.room), 5000);
         } else {
+          // ── Game over: compile stats, emit leaderboard, then purge room ──
+          const stats = await compileEndGameStats(pubClient, user.room);
+          const roomToDelete = user.room; // capture before any async gaps
           setTimeout(async () => {
-            io.to(user.room).emit("wait-screen", "!GAME OVER!");
-            await setRoomFields(pubClient, user.room, { currentRound: "0" });
+            io.to(roomToDelete).emit("end-game-stats", stats);
+            // Delete user Hashes first (before room keys, so no orphan reads)
+            const playerIds = await getPlayers(pubClient, roomToDelete);
+            await Promise.all(playerIds.map(id => deleteUser(pubClient, id)));
+            await deleteRoom(pubClient, roomToDelete);
           }, 3000);
         }
       } else {
@@ -472,9 +499,13 @@ async function main() {
           await setRoomFields(pubClient, room, { currentRound: String(currentRound + 1) });
           setTimeout(() => startNewRound(pubClient, io, room), 5000);
         } else {
+          const stats = await compileEndGameStats(pubClient, room);
+          const roomToDelete = room;
           setTimeout(async () => {
-            io.to(room).emit("wait-screen", "!GAME OVER!");
-            await setRoomFields(pubClient, room, { currentRound: "0" });
+            io.to(roomToDelete).emit("end-game-stats", stats);
+            const playerIds = await getPlayers(pubClient, roomToDelete);
+            await Promise.all(playerIds.map(id => deleteUser(pubClient, id)));
+            await deleteRoom(pubClient, roomToDelete);
           }, 3000);
         }
       }
