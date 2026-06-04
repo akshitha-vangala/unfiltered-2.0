@@ -131,6 +131,32 @@
     <p class="wait-msg" id="results-wait-msg"></p>
   </div>
 
+  <!-- ═══════════════════════════════════════════════
+       SCREEN 6 — FINAL LEADERBOARD
+  ════════════════════════════════════════════════ -->
+  <div id="final-leaderboard-screen" class="screen">
+
+    <div class="leaderboard-header">
+      <span class="logo-eyebrow">game over</span>
+      <h1 class="leaderboard-title">Final<br><em>Standings</em></h1>
+    </div>
+
+    <!-- Ranked player rows -->
+    <ol id="leaderboard-list" class="leaderboard-list" aria-label="Final leaderboard"></ol>
+
+    <!-- Class Clown award — injected by JS only when there's a winner -->
+    <div id="clown-card" class="clown-card" style="display:none;" aria-live="polite">
+      <div class="clown-crown">😂</div>
+      <div class="clown-body">
+        <span class="clown-label">Class Clown Award</span>
+        <p class="clown-name" id="clown-name"></p>
+        <p class="clown-sub" id="clown-sub"></p>
+      </div>
+    </div>
+
+    <button id="btn-play-again" class="btn btn-primary" style="margin-top:28px;">Play Again</button>
+  </div>
+
   <!-- Socket.io client library (served by the Node server) -->
   <script src="/socket.io/socket.io.js"></script>
   <script src="client.js"></script>

@@ -19,11 +19,12 @@ const state = {
 
 // ─── Element refs ─────────────────────────────────────────────────────────────
 const screens = {
-  login:    document.getElementById("login-screen"),
-  lobby:    document.getElementById("lobby-screen"),
-  question: document.getElementById("question-screen"),
-  vote:     document.getElementById("vote-screen"),
-  results:  document.getElementById("results-screen"),
+  login:       document.getElementById("login-screen"),
+  lobby:       document.getElementById("lobby-screen"),
+  question:    document.getElementById("question-screen"),
+  vote:        document.getElementById("vote-screen"),
+  results:     document.getElementById("results-screen"),
+  leaderboard: document.getElementById("final-leaderboard-screen"),
 };
 
 // Login
@@ -60,6 +61,13 @@ const voteError        = document.getElementById("vote-error");
 // Results
 const resultsContainer = document.getElementById("results-container");
 const resultsWaitMsg   = document.getElementById("results-wait-msg");
+
+// Final leaderboard
+const leaderboardList  = document.getElementById("leaderboard-list");
+const clownCard        = document.getElementById("clown-card");
+const clownName        = document.getElementById("clown-name");
+const clownSub         = document.getElementById("clown-sub");
+const btnPlayAgain     = document.getElementById("btn-play-again");
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -359,6 +367,91 @@ socket.on("answer-error", (msg) => {
   btnSubmitAnswer.disabled  = false;
   btnSubmitAnswer.textContent = "Submit Answer";
   state.hasAnswered = false;
+});
+
+// Final leaderboard — emitted once by server when game ends
+socket.on("end-game-stats", (players) => {
+  // players is already sorted by score descending from the server
+  leaderboardList.innerHTML = "";
+  clownCard.style.display   = "none";
+
+  const medals = ["🥇", "🥈", "🥉"];
+
+  players.forEach((player, idx) => {
+    const li = document.createElement("li");
+    li.className = "lb-row" + (player.name === state.name ? " lb-row-me" : "");
+    li.style.animationDelay = `${idx * 70}ms`;
+
+    const rank = document.createElement("span");
+    rank.className   = "lb-rank";
+    rank.textContent = medals[idx] ?? `${idx + 1}`;
+
+    const name = document.createElement("span");
+    name.className   = "lb-name";
+    name.textContent = player.name;
+    if (player.name === state.name) {
+      const youTag = document.createElement("span");
+      youTag.className   = "lb-you-tag";
+      youTag.textContent = "you";
+      name.appendChild(youTag);
+    }
+
+    const pts = document.createElement("span");
+    pts.className   = "lb-score";
+    pts.textContent = `${player.score} pts`;
+
+    if (player.funnyPoints > 0) {
+      const fp = document.createElement("span");
+      fp.className   = "lb-funny-pts";
+      fp.textContent = `😂 ${player.funnyPoints}`;
+      li.appendChild(rank);
+      li.appendChild(name);
+      li.appendChild(fp);
+      li.appendChild(pts);
+    } else {
+      li.appendChild(rank);
+      li.appendChild(name);
+      li.appendChild(pts);
+    }
+
+    leaderboardList.appendChild(li);
+  });
+
+  // ── Class Clown Award ───────────────────────────────────────────────────
+  // Find the player with the most funnyPoints (only award if > 0)
+  const clown = [...players].sort((a, b) => b.funnyPoints - a.funnyPoints)[0];
+  if (clown && clown.funnyPoints > 0) {
+    clownName.textContent = clown.name;
+    clownSub.textContent  =
+      `Earned ${clown.funnyPoints} funny vote${clown.funnyPoints !== 1 ? "s" : ""} across all rounds`;
+    clownCard.style.display = "flex";
+  }
+
+  showScreen("leaderboard");
+});
+
+// Play Again — send the player back to the login screen to start fresh
+btnPlayAgain.addEventListener("click", () => {
+  // Reset local state
+  state.name        = "";
+  state.room        = "";
+  state.isHost      = false;
+  state.truthPick   = null;
+  state.funnyPick   = null;
+  state.hasVoted    = false;
+  state.hasAnswered = false;
+
+  // Reset host controls so they don't bleed into a new session
+  hostControls.style.display   = "none";
+  btnStart.disabled             = false;
+  btnStart.textContent          = "Start Game";
+  inputName.value               = "";
+  inputRoom.value               = "";
+  roomCodeDisplay.textContent   = "????";
+  waitMessage.textContent       = "";
+  playerList.innerHTML          = "";
+
+  showScreen("login");
 });
 
 // Connection error feedback
