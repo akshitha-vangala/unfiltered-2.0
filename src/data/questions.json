@@ -1,0 +1,42 @@
+[
+    {
+        "id": 1,
+        "text": "If {player} became rich suddenly, what's the first thing they'd buy?"
+    },
+    {
+        "id": 2,
+        "text": "If {player} was a movie character, who would they be?"
+    },
+    {
+        "id": 3,
+        "text": "If {player} was famous, what would they be famous for?"
+    },
+    {
+        "id": 4,
+        "text": "What is {player}'s most embarrassing Google search?"
+    },
+    {
+        "id": 5,
+        "text": "If {player} started a cult, what would it be about?"
+    },
+    {
+        "id": 6,
+        "text": "What reality show is {player} most likely to win?"
+    },
+    {
+        "id": 7,
+        "text": "What is the weirdest object in {player}'s bedroom?"
+    },
+    {
+        "id": 8,
+        "text": "If {player} was a ghost, how would they annoy the living?"
+    },
+    {
+        "id": 9,
+        "text": "What crime is {player} most likely to be arrested for?"
+    },
+    {
+        "id": 10,
+        "text": "What is {player}'s secret 'old person' habit?"
+    }
+]

@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Have not decided yet</title>
+    <link rel="stylesheet" href="styles.css">
+
+    
+    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js" defer></script>
+    <script src="./client.js" defer></script>
+    
+</head>
+<body>
+
+    <div id="screen-join" class="screen active">
+        <h1>Welcome to the Game</h1>
+        <input type="text" id="username" placeholder="Enter your Name" maxlength="12"><br>
+        <input type="text" id="room" placeholder="Enter Room Code"><br>
+        <button id="btn-join">Join Room</button>
+    </div>
+
+    <div id="screen-wait" class="screen">
+        <h2>Lobby</h2>
+        <p id="wait-message">Waiting for players...</p>
+        
+        <div id="notification-area"></div>
+
+        <div id="player-list-container">
+            <h3>Connected Players</h3>
+            <ul id="player-list"></ul>
+        </div>
+        <div id="host-controls" style="display: none;">
+            <div class="setting-group">
+                <label for="rounds-input">ROUNDS</label>
+                <input type="number" id="rounds-input" value="5" min="1" max="20">
+            </div>
+            <button id="btn-start">👑 START GAME</button>
+        </div>
+    </div>
+    <div id="screen-answer" class="screen">
+        <h3 style="color: #bdc3c7">THE QUESTION:</h3>
+        <h1 id="question-text">...</h1>
+        <br>
+        <input type="text" id="my-answer" placeholder="Write a convincing lie..." autocomplete="off">
+        <br><br>
+        <button id="btn-submit">Submit Lie</button>
+    </div>
+
+    <div id="screen-vote" class="screen">
+        <h2>Spot the Truth!</h2>
+        <p style="font-size: 0.9em; opacity: 0.8;">
+            <b>Left Click</b> = The Truth (Points for being right)<br>
+            <b>Right Click</b> = The Funniest (Points for laughs)
+        </p>
+        <div id="answers-list" class="card-container"></div>
+        <br>
+        <button id="btn-vote">Lock in Votes</button>
+    </div>
+
+    <div id="screen-results" class="screen">
+        <h2>Round Results</h2>
+        <div id="leaderboard"></div>
+        <br>
+        <button id="btn-leave" style="background: #c0392b;">Leave Game</button>
+    </div>
+    
+
+</body>
+</html>
