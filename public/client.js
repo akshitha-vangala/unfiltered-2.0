@@ -1,219 +1,370 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   client.js — Unfiltered 2.0
+   Handles: login → lobby → question → voting → results
+───────────────────────────────────────────────────────────────────────────── */
+
 const socket = io();
 
-// --- STATE VARIABLES ---
-let currentRoom = "";
-let myName = "";
-let voteTruthIndex = null;
-let voteFunnyIndex = null;
-// --- HOST LOGIC ---
+// ─── State ───────────────────────────────────────────────────────────────────
+const state = {
+  name:       "",
+  room:       "",
+  isHost:     false,
+  // Voting phase
+  truthPick:  null,   // index of answer chosen as "truth"
+  funnyPick:  null,   // index of answer chosen as "funniest"
+  hasVoted:   false,
+  hasAnswered: false,
+};
 
-// --- HOST LOGIC ---
+// ─── Element refs ─────────────────────────────────────────────────────────────
+const screens = {
+  login:    document.getElementById("login-screen"),
+  lobby:    document.getElementById("lobby-screen"),
+  question: document.getElementById("question-screen"),
+  vote:     document.getElementById("vote-screen"),
+  results:  document.getElementById("results-screen"),
+};
 
-// 1. Server tells us we are the host
-socket.on('is-host', () => {
-    const hostControls = document.getElementById('host-controls');
-    const waitMessage = document.getElementById('wait-message');
+// Login
+const inputName       = document.getElementById("input-name");
+const inputRoom       = document.getElementById("input-room");
+const btnJoin         = document.getElementById("btn-join");
+const loginError      = document.getElementById("login-error");
 
-    if (hostControls) {
-        // Show the settings & start button
-        hostControls.style.display = 'flex'; 
-        // Update text to look like a control panel
-        waitMessage.innerText = "You are the Host! Configure the game below.";
+// Lobby
+const roomCodeDisplay = document.getElementById("room-code-display");
+const btnCopyCode     = document.getElementById("btn-copy-code");
+const waitMessage     = document.getElementById("wait-message");
+const notificationMsg = document.getElementById("notification-msg");
+const playerList      = document.getElementById("player-list");
+const hostControls    = document.getElementById("host-controls");
+const settingRounds   = document.getElementById("setting-rounds");
+const settingQpr      = document.getElementById("setting-qpr");
+const settingTheme    = document.getElementById("setting-theme");
+const btnStart        = document.getElementById("btn-start");
+
+// Question
+const roundBadge      = document.getElementById("round-badge");
+const questionText    = document.getElementById("question-text");
+const answerInput     = document.getElementById("answer-input");
+const answerCharCount = document.getElementById("answer-char-count");
+const answerError     = document.getElementById("answer-error");
+const btnSubmitAnswer = document.getElementById("btn-submit-answer");
+
+// Vote
+const answersContainer = document.getElementById("answers-container");
+const btnSubmitVote    = document.getElementById("btn-submit-vote");
+const voteError        = document.getElementById("vote-error");
+
+// Results
+const resultsContainer = document.getElementById("results-container");
+const resultsWaitMsg   = document.getElementById("results-wait-msg");
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/** Hide all screens, then show the requested one. */
+function showScreen(name) {
+  Object.values(screens).forEach(s => s.classList.remove("active"));
+  screens[name].classList.add("active");
+}
+
+/** Flash a transient notification in the lobby. */
+let notifTimer = null;
+function showNotification(msg) {
+  notificationMsg.textContent = msg;
+  notificationMsg.classList.add("visible");
+  clearTimeout(notifTimer);
+  notifTimer = setTimeout(() => {
+    notificationMsg.classList.remove("visible");
+  }, 3500);
+}
+
+/** Check whether both vote picks are selected and toggle the submit button. */
+function refreshVoteButton() {
+  btnSubmitVote.disabled = (state.truthPick === null || state.funnyPick === null);
+}
+
+// ─── Login flow ───────────────────────────────────────────────────────────────
+
+btnJoin.addEventListener("click", () => {
+  const name = inputName.value.trim();
+  const room = inputRoom.value.trim().toUpperCase();
+
+  if (!name) {
+    loginError.textContent = "Please enter your name.";
+    inputName.focus();
+    return;
+  }
+  loginError.textContent = "";
+
+  state.name = name;
+  // Send room as null when blank so the server generates a code
+  socket.emit("join-room", room || null, name);
+});
+
+// Allow Enter key on either login input
+[inputName, inputRoom].forEach(el => {
+  el.addEventListener("keydown", e => { if (e.key === "Enter") btnJoin.click(); });
+});
+
+// ─── Copy room code ───────────────────────────────────────────────────────────
+
+btnCopyCode.addEventListener("click", () => {
+  if (!state.room) return;
+  navigator.clipboard.writeText(state.room).then(() => {
+    btnCopyCode.textContent = "✓";
+    setTimeout(() => (btnCopyCode.textContent = "⧉"), 1500);
+  });
+});
+
+// ─── Host: start game ─────────────────────────────────────────────────────────
+
+btnStart.addEventListener("click", () => {
+  const settings = {
+    maxRounds:         parseInt(settingRounds.value, 10) || 5,
+    questionsPerRound: parseInt(settingQpr.value,    10) || 1,
+    theme:             settingTheme.value.trim() || "default",
+  };
+  socket.emit("request-start-game", settings);
+  btnStart.disabled    = true;
+  btnStart.textContent = "Starting…";
+});
+
+// ─── Answer: character counter + submit ───────────────────────────────────────
+
+answerInput.addEventListener("input", () => {
+  const remaining = 200 - answerInput.value.length;
+  answerCharCount.textContent = `${remaining} character${remaining !== 1 ? "s" : ""} left`;
+  answerCharCount.style.color = remaining < 20 ? "var(--accent)" : "";
+});
+
+btnSubmitAnswer.addEventListener("click", () => {
+  const text = answerInput.value.trim();
+  if (!text) {
+    answerError.textContent = "Answer cannot be empty.";
+    answerInput.focus();
+    return;
+  }
+  answerError.textContent = "";
+  socket.emit("submit-answer", text);
+
+  // Disable to prevent double-submit
+  btnSubmitAnswer.disabled    = true;
+  btnSubmitAnswer.textContent = "Submitted ✓";
+  state.hasAnswered = true;
+});
+
+// ─── Vote: submit ─────────────────────────────────────────────────────────────
+
+btnSubmitVote.addEventListener("click", () => {
+  if (state.truthPick === null || state.funnyPick === null) {
+    voteError.textContent = "Please pick both a Truth and a Funniest answer.";
+    return;
+  }
+  voteError.textContent = "";
+  socket.emit("submit-vote", state.truthPick, state.funnyPick);
+
+  btnSubmitVote.disabled    = true;
+  btnSubmitVote.textContent = "Votes submitted ✓";
+  state.hasVoted = true;
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Socket event listeners
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Server confirmed a room code (new or existing)
+socket.on("room-code", (code) => {
+  state.room           = code;
+  roomCodeDisplay.textContent = code;
+  showScreen("lobby");
+});
+
+// Server tells this socket it's the host
+socket.on("is-host", () => {
+  state.isHost = true;
+  hostControls.style.display = "flex";
+});
+
+// Generic wait / status message (lobby + mid-game)
+socket.on("wait-screen", (msg) => {
+  // If we're in an active game screen, push back to lobby with the message
+  if (
+    screens.question.classList.contains("active") ||
+    screens.vote.classList.contains("active")     ||
+    screens.results.classList.contains("active")
+  ) {
+    waitMessage.textContent = msg;
+    showScreen("lobby");
+    return;
+  }
+  // Already on the lobby — just update the message
+  waitMessage.textContent = msg;
+  showScreen("lobby");
+});
+
+// Room-level notifications (joins / leaves)
+socket.on("notification", (msg) => {
+  showNotification(msg);
+});
+
+// Live player list update
+socket.on("update-player-list", (names) => {
+  playerList.innerHTML = "";
+  names.forEach(name => {
+    const li = document.createElement("li");
+    li.textContent = name;
+    if (name === state.name) li.classList.add("me");
+    playerList.appendChild(li);
+  });
+});
+
+// New round begins — show the question screen
+socket.on("new-round", (questionStr) => {
+  // Reset answer state
+  state.hasAnswered         = false;
+  answerInput.value         = "";
+  answerCharCount.textContent = "200 characters left";
+  answerCharCount.style.color = "";
+  answerError.textContent   = "";
+  btnSubmitAnswer.disabled  = false;
+  btnSubmitAnswer.textContent = "Submit Answer";
+
+  questionText.textContent = questionStr;
+  showScreen("question");
+});
+
+// Voting phase begins — build answer buttons
+socket.on("start-voting", (answers) => {
+  // Reset vote state
+  state.truthPick   = null;
+  state.funnyPick   = null;
+  state.hasVoted    = false;
+  voteError.textContent = "";
+  btnSubmitVote.disabled    = true;
+  btnSubmitVote.textContent = "Submit Votes";
+
+  answersContainer.innerHTML = "";
+
+  answers.forEach((answer, idx) => {
+    const card = document.createElement("div");
+    card.className = "answer-option";
+    card.dataset.idx = idx;
+
+    const answerBody = document.createElement("p");
+    answerBody.className = "answer-option-text";
+    answerBody.textContent = answer.text;
+
+    const voteRow = document.createElement("div");
+    voteRow.className = "vote-row";
+
+    // ── Truth button ───────────────────────────────
+    const btnTruth = document.createElement("button");
+    btnTruth.className = "btn btn-vote btn-truth";
+    btnTruth.textContent = "🎯 Truth";
+    btnTruth.setAttribute("aria-label", `Mark answer ${idx + 1} as truth`);
+    btnTruth.addEventListener("click", () => {
+      state.truthPick = idx;
+      // Clear previous truth selection
+      document.querySelectorAll(".btn-truth").forEach(b => b.classList.remove("selected"));
+      btnTruth.classList.add("selected");
+      refreshVoteButton();
+    });
+
+    // ── Funny button ───────────────────────────────
+    const btnFunny = document.createElement("button");
+    btnFunny.className = "btn btn-vote btn-funny";
+    btnFunny.textContent = "😂 Funniest";
+    btnFunny.setAttribute("aria-label", `Mark answer ${idx + 1} as funniest`);
+    btnFunny.addEventListener("click", () => {
+      state.funnyPick = idx;
+      document.querySelectorAll(".btn-funny").forEach(b => b.classList.remove("selected"));
+      btnFunny.classList.add("selected");
+      refreshVoteButton();
+    });
+
+    voteRow.appendChild(btnTruth);
+    voteRow.appendChild(btnFunny);
+    card.appendChild(answerBody);
+    card.appendChild(voteRow);
+    answersContainer.appendChild(card);
+  });
+
+  showScreen("vote");
+});
+
+// Results for the round
+socket.on("show-results", (results) => {
+  resultsContainer.innerHTML = "";
+  resultsWaitMsg.textContent  = "Next round starting soon…";
+
+  // Sort: most truth votes first
+  const sorted = [...results].sort((a, b) => b.score - a.score);
+
+  sorted.forEach((result, rank) => {
+    const card = document.createElement("div");
+    card.className = "result-card" + (result.isCorrect ? " result-truth" : "");
+
+    const header = document.createElement("div");
+    header.className = "result-header";
+
+    const authorEl = document.createElement("span");
+    authorEl.className = "result-author";
+    authorEl.textContent = result.author;
+
+    const badges = document.createElement("div");
+    badges.className = "result-badges";
+
+    if (result.isCorrect) {
+      const trueBadge = document.createElement("span");
+      trueBadge.className = "badge badge-truth";
+      trueBadge.textContent = "✓ Truth";
+      badges.appendChild(trueBadge);
     }
-});
-
-// 2. Host clicks Start
-const startBtn = document.getElementById('btn-start');
-if (startBtn) {
-    startBtn.addEventListener('click', () => {
-        const roundsInput = document.getElementById('rounds-input');
-        const totalRounds = roundsInput ? roundsInput.value : 5; // Get value
-        
-        // Send start request with settings
-        socket.emit('request-start-game', totalRounds);
-    });
-}
-// --- LISTEN FOR PLAYER LIST UPDATES ---
-socket.on('update-player-list', (names) => {
-    const list = document.getElementById('player-list');
-    const myName = document.getElementById('username').value; // Get my own name
-
-    if (list) {
-        list.innerHTML = ""; // Clear the old list
-        
-        names.forEach(name => {
-            const li = document.createElement('li');
-            li.textContent = name;
-            
-            // Highlight myself
-            if (name === myName) {
-                li.classList.add('me');
-                li.textContent += " (You)";
-            }
-            
-            list.appendChild(li);
-        });
+    if (result.score > 0) {
+      const voteBadge = document.createElement("span");
+      voteBadge.className = "badge badge-votes";
+      voteBadge.textContent = `🎯 ${result.score}`;
+      badges.appendChild(voteBadge);
     }
-});
-// --- NOTIFICATION SYSTEM ---
-socket.on("notification", (message) => {
-    const container = document.getElementById('notification-area');
-    if (!container) return;
+    if (result.funnyScore > 0) {
+      const funnyBadge = document.createElement("span");
+      funnyBadge.className = "badge badge-funny";
+      funnyBadge.textContent = `😂 ${result.funnyScore}`;
+      badges.appendChild(funnyBadge);
+    }
 
-    // Create the message element
-    const msgDiv = document.createElement('div');
-    msgDiv.classList.add('notify-msg');
-    msgDiv.innerText = message;
-    
-    // Add to screen
-    container.appendChild(msgDiv);
+    header.appendChild(authorEl);
+    header.appendChild(badges);
 
-    // Remove it after 3 seconds
-    setTimeout(() => {
-        msgDiv.style.opacity = '0';
-        setTimeout(() => msgDiv.remove(), 500); // Wait for fade out
-    }, 3000);
-});
-// --- UI HELPER: SWITCH SCREENS ---
-function showScreen(screenId) {
-    // Hide all screens first
-    document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
-    // Show the target screen
-    const screen = document.getElementById(screenId);
-    if(screen) screen.classList.add('active');
-}
+    const textEl = document.createElement("p");
+    textEl.className = "result-text";
+    textEl.textContent = result.text;
 
-// ==========================
-// 1. JOINING LOGIC
-// ==========================
-const joinBtn = document.getElementById('btn-join');
+    card.appendChild(header);
+    card.appendChild(textEl);
 
-if (joinBtn) {
-    joinBtn.addEventListener('click', () => {
-        myName = document.getElementById('username').value.trim();
-        currentRoom = document.getElementById('room').value.trim();
+    // Stagger in
+    card.style.animationDelay = `${rank * 80}ms`;
+    resultsContainer.appendChild(card);
+  });
 
-        if (!myName || !currentRoom) {
-            alert("Please enter both Name and Room!");
-            return;
-        }
-
-        // Emit 'join-room' event to server
-        socket.emit('join-room', currentRoom, myName);
-        
-        // Move to waiting screen immediately
-        document.getElementById('wait-message').innerText = `Joined ${currentRoom}. Waiting for round to start...`;
-        showScreen('screen-wait');
-    });
-}
-
-// ==========================
-// 2. ANSWERING LOGIC
-// ==========================
-socket.on('new-round', (question) => {
-    document.getElementById('question-text').innerText = question;
-    document.getElementById('my-answer').value = ""; // Clear previous answer
-    showScreen('screen-answer');
+  showScreen("results");
 });
 
-const submitBtn = document.getElementById('btn-submit');
-if (submitBtn) {
-    submitBtn.addEventListener('click', () => {
-        const answer = document.getElementById('my-answer').value.trim();
-        if (!answer) return;
-
-        socket.emit('submit-answer', answer);
-        
-        document.getElementById('wait-message').innerText = "Answer sent! Waiting for other slowpokes...";
-        showScreen('screen-wait');
-    });
-}
-
-// ==========================
-// 3. VOTING LOGIC
-// ==========================
-socket.on('start-voting', (shuffledAnswers) => {
-    const list = document.getElementById('answers-list');
-    list.innerHTML = ""; // Clear old cards
-    voteTruthIndex = null;
-    voteFunnyIndex = null;
-
-    shuffledAnswers.forEach((ans, index) => {
-        const btn = document.createElement('div');
-        btn.className = 'vote-card';
-        btn.innerText = ans.text;
-
-        // LEFT CLICK -> Truth Vote
-        btn.onclick = () => {
-            document.querySelectorAll('.vote-card').forEach(c => c.classList.remove('selected-truth'));
-            btn.classList.add('selected-truth');
-            voteTruthIndex = index;
-        };
-
-        // RIGHT CLICK -> Funny Vote
-        btn.oncontextmenu = (e) => {
-            e.preventDefault(); // Stop normal right-click menu
-            document.querySelectorAll('.vote-card').forEach(c => c.classList.remove('selected-funny'));
-            btn.classList.add('selected-funny');
-            voteFunnyIndex = index;
-        };
-
-        list.appendChild(btn);
-    });
-
-    showScreen('screen-vote');
+// Server-side validation error on answer submission
+socket.on("answer-error", (msg) => {
+  answerError.textContent   = msg;
+  btnSubmitAnswer.disabled  = false;
+  btnSubmitAnswer.textContent = "Submit Answer";
+  state.hasAnswered = false;
 });
 
-const voteBtn = document.getElementById('btn-vote');
-if (voteBtn) {
-    voteBtn.addEventListener('click', () => {
-        if (voteTruthIndex === null) {
-            alert("You must pick the TRUTH (Left Click)!");
-            return;
-        }
-        // It's okay if they don't pick a funny one, send null
-        socket.emit('submit-vote', voteTruthIndex, voteFunnyIndex);
-
-        document.getElementById('wait-message').innerText = "Votes cast! Calculating the damage...";
-        showScreen('screen-wait');
-    });
-}
-
-// ==========================
-// 4. RESULTS LOGIC
-// ==========================
-socket.on('show-results', (results) => {
-    const board = document.getElementById('leaderboard');
-    board.innerHTML = "";
-
-    results.forEach(p => {
-        // p contains: { author, text, score, funnyScore }
-        const div = document.createElement('div');
-        div.className = 'result-entry';
-        div.innerHTML = `
-            <strong>${p.author}</strong> wrote: "<em>${p.text}</em>"<br>
-            <span style="color:#2ecc71">✅ Truth Votes: ${p.score}</span> | 
-            <span style="color:#f1c40f">😂 Funny Votes: ${p.funnyScore}</span>
-        `;
-        board.appendChild(div);
-    });
-
-    showScreen('screen-results');
+// Connection error feedback
+socket.on("connect_error", () => {
+  loginError.textContent = "Could not connect to server. Retrying…";
 });
-
-// ==========================
-// 5. LEAVING LOGIC
-// ==========================
-const leaveBtn = document.getElementById('btn-leave');
-if (leaveBtn) {
-    leaveBtn.addEventListener('click', () => {
-        socket.disconnect(); 
-        location.reload(); 
-    });
-}
-
-// Generic wait message handler from server
-socket.on('wait-screen', (msg) => {
-    document.getElementById('wait-message').innerText = msg;
-    showScreen('screen-wait');
+socket.on("reconnect", () => {
+  loginError.textContent = "";
 });

@@ -1,70 +1,138 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Have not decided yet</title>
-    <link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Unfiltered 2.0</title>
 
-    
-    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js" defer></script>
-    <script src="./client.js" defer></script>
-    
+  <!-- Google Fonts: Playfair Display (display) + DM Sans (body) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,400&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
 
-    <div id="screen-join" class="screen active">
-        <h1>Welcome to the Game</h1>
-        <input type="text" id="username" placeholder="Enter your Name" maxlength="12"><br>
-        <input type="text" id="room" placeholder="Enter Room Code"><br>
-        <button id="btn-join">Join Room</button>
+  <!-- ═══════════════════════════════════════════════
+       SCREEN 1 — LOGIN
+  ════════════════════════════════════════════════ -->
+  <div id="login-screen" class="screen active">
+    <div class="logo-lockup">
+      <span class="logo-eyebrow">party game</span>
+      <h1 class="logo-title">Unfiltered<em>.</em></h1>
+      <p class="logo-sub">Bluff. Reveal. Judge.</p>
     </div>
 
-    <div id="screen-wait" class="screen">
-        <h2>Lobby</h2>
-        <p id="wait-message">Waiting for players...</p>
-        
-        <div id="notification-area"></div>
+    <div class="card">
+      <label class="field-label" for="input-name">Your name</label>
+      <input id="input-name" type="text" placeholder="e.g. Alex" maxlength="20" autocomplete="off" />
 
-        <div id="player-list-container">
-            <h3>Connected Players</h3>
-            <ul id="player-list"></ul>
+      <label class="field-label" for="input-room">Room code <span class="field-hint">(leave blank to create new)</span></label>
+      <input id="input-room" type="text" placeholder="e.g. BQRT" maxlength="4" autocomplete="off"
+             style="text-transform:uppercase; letter-spacing:0.25em;" />
+
+      <button id="btn-join" class="btn btn-primary">Enter Room</button>
+      <p id="login-error" class="error-msg" aria-live="polite"></p>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       SCREEN 2 — LOBBY / WAITING ROOM
+  ════════════════════════════════════════════════ -->
+  <div id="lobby-screen" class="screen">
+
+    <div class="room-pill">
+      Room&nbsp;<strong id="room-code-display">????</strong>
+      <button class="btn-copy" id="btn-copy-code" title="Copy code">⧉</button>
+    </div>
+
+    <h2 class="screen-title">Waiting for players…</h2>
+    <p id="wait-message" class="wait-msg"></p>
+
+    <!-- Player list -->
+    <div id="player-list-container">
+      <h3 class="section-label">Players</h3>
+      <ul id="player-list"></ul>
+    </div>
+
+    <!-- Notifications -->
+    <p id="notification-msg" class="notification" aria-live="polite"></p>
+
+    <!-- ── Host-only controls ─────────────────── -->
+    <div id="host-controls" style="display:none;">
+      <h3 class="section-label">Game Settings</h3>
+
+      <div class="settings-grid">
+        <div class="setting-group">
+          <label class="field-label" for="setting-rounds">Rounds</label>
+          <input id="setting-rounds" type="number" min="1" max="20" value="5" />
         </div>
-        <div id="host-controls" style="display: none;">
-            <div class="setting-group">
-                <label for="rounds-input">ROUNDS</label>
-                <input type="number" id="rounds-input" value="5" min="1" max="20">
-            </div>
-            <button id="btn-start">👑 START GAME</button>
+        <div class="setting-group">
+          <label class="field-label" for="setting-qpr">Questions / Round</label>
+          <input id="setting-qpr" type="number" min="1" max="5" value="1" />
         </div>
+        <div class="setting-group full-width">
+          <label class="field-label" for="setting-theme">Theme</label>
+          <input id="setting-theme" type="text" placeholder="e.g. spicy, wholesome…" />
+        </div>
+      </div>
+
+      <button id="btn-start" class="btn btn-primary">Start Game</button>
     </div>
-    <div id="screen-answer" class="screen">
-        <h3 style="color: #bdc3c7">THE QUESTION:</h3>
-        <h1 id="question-text">...</h1>
-        <br>
-        <input type="text" id="my-answer" placeholder="Write a convincing lie..." autocomplete="off">
-        <br><br>
-        <button id="btn-submit">Submit Lie</button>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       SCREEN 3 — QUESTION / ANSWER PHASE
+  ════════════════════════════════════════════════ -->
+  <div id="question-screen" class="screen">
+    <div class="round-badge" id="round-badge">Round 1</div>
+    <h2 class="question-text" id="question-text"></h2>
+
+    <div class="card answer-card">
+      <label class="field-label" for="answer-input">Your answer</label>
+      <textarea id="answer-input" rows="3" placeholder="Type something…" maxlength="200"></textarea>
+      <p id="answer-char-count" class="char-count">200 characters left</p>
+      <p id="answer-error" class="error-msg" aria-live="polite"></p>
+      <button id="btn-submit-answer" class="btn btn-primary">Submit Answer</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       SCREEN 4 — VOTE SCREEN
+  ════════════════════════════════════════════════ -->
+  <div id="vote-screen" class="screen">
+    <div class="vote-header">
+      <h2 class="screen-title">Cast Your Votes</h2>
+      <div class="vote-legend">
+        <span class="legend-dot dot-truth"></span> Truth
+        <span class="legend-dot dot-funny" style="margin-left:14px;"></span> Funniest
+      </div>
     </div>
 
-    <div id="screen-vote" class="screen">
-        <h2>Spot the Truth!</h2>
-        <p style="font-size: 0.9em; opacity: 0.8;">
-            <b>Left Click</b> = The Truth (Points for being right)<br>
-            <b>Right Click</b> = The Funniest (Points for laughs)
-        </p>
-        <div id="answers-list" class="card-container"></div>
-        <br>
-        <button id="btn-vote">Lock in Votes</button>
-    </div>
+    <p class="vote-instructions">
+      Pick one answer you think is <strong>true</strong>,
+      and one you think is the <strong>funniest</strong>.
+      You can pick the same answer for both.
+    </p>
 
-    <div id="screen-results" class="screen">
-        <h2>Round Results</h2>
-        <div id="leaderboard"></div>
-        <br>
-        <button id="btn-leave" style="background: #c0392b;">Leave Game</button>
-    </div>
-    
+    <div id="answers-container"></div>
 
+    <button id="btn-submit-vote" class="btn btn-primary" disabled>Submit Votes</button>
+    <p id="vote-error" class="error-msg" aria-live="polite"></p>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       SCREEN 5 — RESULTS SCREEN
+  ════════════════════════════════════════════════ -->
+  <div id="results-screen" class="screen">
+    <h2 class="screen-title">Round Results</h2>
+    <div id="results-container"></div>
+    <p class="wait-msg" id="results-wait-msg"></p>
+  </div>
+
+  <!-- Socket.io client library (served by the Node server) -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="client.js"></script>
 </body>
 </html>
