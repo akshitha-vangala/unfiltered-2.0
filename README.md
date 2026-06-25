@@ -20,7 +20,7 @@
 - [Scoring System](#scoring-system)
 - [Adding Questions](#adding-questions)
 - [Sound Effects](#sound-effects)
-- [Development Tips](#development-tips)
+
 
 ---
 
@@ -292,33 +292,4 @@ Because browsers block audio until a user gesture has occurred, the audio contex
 
 ---
 
-## Development Tips
 
-**Make the port configurable:**
-
-In `src/server.js`, change the `server.listen` call:
-```js
-const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => {
-  console.log(`✅ SERVER RUNNING: http://localhost:${PORT}`);
-});
-```
-
-**Watch for file changes during development:**
-```bash
-npm run dev   # uses nodemon
-```
-
-**Inspect Redis state live:**
-```bash
-redis-cli
-> KEYS *              # list all keys
-> HGETALL room:ABCD   # inspect a room's config
-> LRANGE room:ABCD:players 0 -1   # list players in a room
-```
-
-**Test with multiple players locally:**
-Open several browser tabs or windows to `http://localhost:3001`. Each tab gets its own socket connection and counts as a separate player.
-
-**Deploying:**
-The app needs both a Node.js host and a Redis instance. Platforms like Railway, Render, or Fly.io support both. Set `REDIS_URL` to your hosted Redis URL and you're good to go.
